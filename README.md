@@ -14,5 +14,4 @@ We conduct large-scale passive measurements of one popular mobile app of Baidu. 
 The request logs could be found in `<Measurements>`.  
 It is worth mentioning that the analysis of user's location and ISP in our paper is based on user's IP addresses. For ethical and privacy considerations, we have hidden the ip address as well as other private imformation in the logs. Therefore, readers may not be able to obtain these two information. Information related to the status of the network and the transport process of the request is still available.
 
-For any questions, please post an issue or send an email to [joycezhangjia@gmail.com](mailto:joycezhangjia@gmail.com).
-
+For any questions, please post an issue or send an email to [joycezhangjia@gmail.com]
