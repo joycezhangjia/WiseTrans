@@ -16,14 +16,14 @@ The description of the keywords in the logs is listed below.
 
 Field Name | Data Type | Description
 ------|------|---------
-base/nettype | int32 | 2G=0
-response/connection\_info  | int32 |
-response/received\_bytes | int32 |
-response/sent | int32 |
-timing/duration | int32 |
-timing/head\_recv | int32 |
-timing/ttfb | int32 | 
-timing/send | int32 |
-timing/body\_recv | int32 |
+response/connection\_info  | int32 | UNKNOWN=0, HTTP1\_1=1,DEPRECATED\_SPDY2=2, SPDY3=3, HTTP2=4, QUIC=5
+response/received\_bytes | int32 | Received bytes
+response/sent | int32 | Sent bytes
+timing/duration | int32 | The time interval between the client sending request and receiving the whole response body
+timing/head\_recv | int32 | The duration of receiving the response header
+timing/ttfb | int32 | The time interval from the client sending the request to the client receiving the first byte
+timing/send | int32 | The duration of sending the request (after connection establishment)
+timing/body\_recv | int32 | The duration of receiving the response body
 secondary/network\_quality\_records\_stats/tcp\_retrans\_cnt | int32 |
-   
+secondary/network\_quality\_records\_stats/tcp\_rtt\_ms\_avg | int32 | Average RTT in time window
+secondary/network\_quality\_records\_stats/http\_ttfb\_ms\_avg | int32 | Average TTFB in time window
