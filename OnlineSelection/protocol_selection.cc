@@ -9,15 +9,9 @@
 
 
 namespace {
-
-const uint32_t kObservativeLargeWindow = 30;
-const uint32_t kObservativeMediumWindow = 15;
-const uint32_t kObservativeSmallWindow = 8;
-
-const uint32_t kObservativeWindows[] = {
-        kObservativeLargeWindow,
-        kObservativeMediumWindow,
-        kObservativeSmallWindow
+    //...
+    //...
+    //...
 };
 
 }  // namespace
@@ -45,70 +39,11 @@ namespace net {
     int var=0;
 
     
-    bool SenseNetworkQuality(
-            NetworkQualitySnapshotMap& snapshots) {
-        static_assert(arraysize(kObservativeWindows) == 3,
-                      "Size of kObservativeWindows must be equals to 3.");
-
-        const auto& large_window_it = snapshots.find(kObservativeLargeWindow);
-        const auto& medium_window_it = snapshots.find(kObservativeMediumWindow);
-        const auto& small_window_it = snapshots.find(kObservativeSmallWindow);
-        if (large_window_it == snapshots.end() ||
-            medium_window_it == snapshots.end() ||
-            small_window_it == snapshots.end())
-            return false;
-
-        const auto& large_window = large_window_it->second;
-        const auto& medium_window = medium_window_it->second;
-        const auto& small_window = small_window_it->second;
-
-        bool connect_happened_in_large_window = false;
-        uint32_t socket_begin_count_in_large_window =
-                large_window.socket_conn_begin_end_succeed +
-                large_window.socket_conn_begin_end_failed +
-                large_window.socket_conn_begin_pending +
-                large_window.url_request_out_of_interval;
-        uint32_t socket_begin_count_in_medium_window =
-                medium_window.socket_conn_begin_end_succeed +
-                medium_window.socket_conn_begin_end_failed +
-                medium_window.socket_conn_begin_pending;
-        if (socket_begin_count_in_large_window >
-            socket_begin_count_in_medium_window) {
-            connect_happened_in_large_window = true;
-        }
-
-        bool no_data_writed = false;
-        if (small_window.socket_write_ok_count == 0 &&
-            medium_window.socket_write_ok_count == 0)
-            no_data_writed = true;
-
-        bool no_data_read = false;
-        if (small_window.socket_read_ok_count == 0 &&
-            medium_window.socket_read_ok_count == 0)
-            no_data_read = true;
-
-#if !defined(NDEBUG) && defined(ENABLE_NQE_DEBUG_LOG)
-        bool has_socket_connection_pending = false;
-  if (small_window.socket_conn_begin_pending > 0 ||
-      small_window.socket_conn_out_of_interval > 0 ||
-      medium_window.socket_conn_begin_pending > 0 ||
-      medium_window.socket_conn_out_of_interval > 0 ||
-      large_window.socket_conn_begin_pending > 0 ||
-      large_window.socket_conn_out_of_interval > 0) {
-    has_socket_connection_pending = true;
-  }
-#endif
-
-        bool has_url_request_pending = false;
-        if (small_window.url_request_begin_pending > 0 ||
-            small_window.url_request_out_of_interval > 0 ||
-            medium_window.url_request_begin_pending > 0 ||
-            medium_window.url_request_out_of_interval > 0 ||
-            large_window.url_request_begin_pending > 0 ||
-            large_window.url_request_out_of_interval > 0) {
-            has_url_request_pending = true;
-        }
-
+    bool SenseNetworkQuality(NetworkQualitySnapshotMap& snapshots) {
+        //...
+        //...
+        //...
+                             
         // 1, try probing
         if (connect_happened_in_large_window == true &&
             no_data_writed == true &&
@@ -119,11 +54,11 @@ namespace net {
             MaybeStartProbeJob();
         }
 
-        // 2, judge by records data
+        // 2, select by records data
         if (current_network_quality_index_ != NETWORK_QUALITY_PROBING) {
-            if (JudgeWeakNet()) {
+            if (SelectProtocol()) {
                 current_network_quality_index_ = NETWORK_QUALITY_BAD;
-                DVLOG(1) << "NQE judge weak net, reason: " << weak_net_reason_;
+                DVLOG(1) << "WiseTrans selects QUIC, reason: " << quic_selection_reason_;
             } else if (no_data_read == false) {
                 current_network_quality_index_ = NETWORK_QUALITY_CONNECTED;
             } else {
@@ -139,13 +74,39 @@ namespace net {
 
         return true;
     }
+    
+    void MaybeStartProbeJob() {
+        if (is_probing_)
+            return;
 
-    bool JudgeWeakNet() {
-        const baidu::BdConfigReader* reader = baidu::BdConfigReader::Get();
-        if (!reader) {
-            return false;
+        // Avoid frequent probe, which may result in loss of flow and attack on the
+        // probe target.
+        if (!last_probe_time_.is_null()) {
+            base::TimeDelta duration = base::TimeTicks::Now() - last_probe_time_;
+            if (duration <
+                base::TimeDelta::FromSeconds(kDefaultMinProbeIntervalInSecond))
+                return;
         }
-        const baidu::BdConfig* config = reader->GetBdConfigPtr();
+
+        current_network_quality_index_ = NETWORK_QUALITY_PROBING;
+
+        DVLOG(2) << "start probe job";
+        probe_record_.reset(new ProbeRecord());
+        probe_request_.reset(
+                new ProbeRequest(probe_record_, ProbeRequest::CUSTOMIZED_PROBE_HTTP,
+                                 base::Bind(&NetworkQualityEstimator::ProbeJobDone,
+                                            weak_ptr_factory_.GetWeakPtr())));
+        probe_request_->StartProbe();
+
+        is_probing_ = true;
+        last_probe_time_ = base::TimeTicks::Now();
+    }
+
+
+    bool SelectProtocol() {
+        //...
+        //...
+        //...
 
         int weak_window_sec = -1;
         if (config->nq.weak_window_sec > 0 || config->nq.weak_window_sec == -1)
@@ -155,34 +116,30 @@ namespace net {
         if (config->nq.weak_min_cnt >= 0)
             weak_min_cnt = config->nq.weak_min_cnt;
 #if defined(OS_IOS)
-
+        //...
+        //...
+        //...
 #elif defined(OS_ANDROID)
-        if (JudgeWeakNetByXGB(weak_window_sec, weak_min_cnt)){
+        if (SelectProtocolByXGB(weak_window_sec, weak_min_cnt)){
             return true;
         }
 #endif
 
-        weak_net_reason_ = "";
+        quic_selection_reason_ = "";
         return false;
     }
 
     
-    bool JudgeWeakNetBySocketRecordsForData(int window, int min_cnt) {
-        const baidu::BdConfigReader* reader = baidu::BdConfigReader::Get();
-        if (!reader) {
-            return false;
-        }
-        const baidu::BdConfig* config = reader->GetBdConfigPtr();
+    bool SelectProtocolBySocketRecordsForData(int window, int min_cnt) {
+        //...
+        //...
+        //...
 
         if (!config->nq.weak_policy_tcp_retrans_enable &&
-            !config->nq.weak_policy_tcp_recv_len_enable &&
             !config->nq.weak_policy_tcp_rtt_enable) {
             return false;
         }
 
-        int tcp_rtt_threshold = kDefaultWeakPolicyTcpRttThresholdMs;
-        if (config->nq.weak_policy_tcp_rtt_threshold_ms > 0)
-            tcp_rtt_threshold = config->nq.weak_policy_tcp_rtt_threshold_ms;
 
         base::TimeTicks now_tick = tick_clock_->NowTicks();
         base::TimeTicks anchor = base::TimeTicks();
@@ -200,12 +157,7 @@ namespace net {
         int retrans_cnt = 0;
 #endif
 
-
-        int total_recv_cnt = 0;
-        int recv_mss_len_cnt = 0;
-
         int total_tcp_rtt_cnt = 0;
-        int tcp_rtt_weak_cnt = 0;
         int total_tcp_rtt_sum = 0;
         int total_tcp_rtt_avg = 0;
 
@@ -215,7 +167,6 @@ namespace net {
                 continue;
             }
 
-            int rcv_mss = kDefaultMss;
 #if defined(OS_IOS)
             int cur_txretransmitbytes_first = 0;
             int cur_txretransmitbytes_last = 0;
@@ -224,11 +175,6 @@ namespace net {
             int cur_retrans_first = 0;
             int cur_retrans_last = 0;
 #endif
-
-
-            int snd_mss = kDefaultMss;
-            int cur_retrans_first = 0;
-            int cur_retrans_last = 0;
 
 
             // traverse tcp_info_list: get mss, get retrans count, get tcp_rtt count
@@ -246,25 +192,10 @@ namespace net {
                         cur_retrans_first = tcp_info_list[i].tcp_info_.tcpi_total_retrans;
 #endif
                     }
-
                     break;
                 }
 
                 if (i == tcp_info_list_len - 1) {
-// judge mss by the last tcp_info
-#if defined(OS_IOS)
-                    if (tcp_info_list[i].tcp_info_.tcpi_maxseg > 0) {
-          rcv_mss = tcp_info_list[i].tcp_info_.tcpi_maxseg;
-        }
-#elif defined(OS_ANDROID)
-                    if (tcp_info_list[i].tcp_info_.tcpi_snd_mss > 0) {
-          snd_mss = tcp_info_list[i].tcp_info_.tcpi_snd_mss;
-        }
-        if (tcp_info_list[i].tcp_info_.tcpi_rcv_mss > 0) {
-          rcv_mss = tcp_info_list[i].tcp_info_.tcpi_rcv_mss;
-        }
-#endif
-
                     // record the last retrans
 #if defined(OS_IOS)
                     cur_txretransmitbytes_last =
@@ -285,8 +216,6 @@ namespace net {
                     if (tcp_info_list[i].tcp_info_.tcpi_rttcur != 0) {
                         total_tcp_rtt_cnt++;
                         total_tcp_rtt_sum = total_tcp_rtt_sum + tcp_info_list[i].tcp_info_.tcpi_rttcur;
-                        if (tcp_info_list[i].tcp_info_.tcpi_rttcur > tcp_rtt_threshold)
-                            tcp_rtt_weak_cnt++;
                     }
                 }
             }
@@ -307,18 +236,9 @@ namespace net {
                     break;
                 }
 
-                // if no tcp_recv_len or tcp_retrans policy, do not traverse the event list
-                if (!config->nq.weak_policy_tcp_recv_len_enable &&
-                    !config->nq.weak_policy_tcp_retrans_enable) {
+                // if no tcp_retrans policy, do not traverse the event list
+                if (!config->nq.weak_policy_tcp_retrans_enable) {
                     break;
-                }
-
-                if (config->nq.weak_policy_tcp_recv_len_enable) {
-                    if (event_list[i].state_ == SocketPerformanceWatcher::STATE_READ_OK) {
-                        total_recv_cnt++;
-                        if (event_list[i].rv_ == rcv_mss)
-                            recv_mss_len_cnt++;
-                    }
                 }
 
                 if (config->nq.weak_policy_tcp_retrans_enable) {
@@ -341,87 +261,19 @@ namespace net {
         Rtt = total_tcp_rtt_cnt > 0 ? (total_tcp_rtt_sum / total_tcp_rtt_cnt) : 0;
 
 #elif defined(OS_IOS)
-
-        // judge by tcp_retrans policy
-
-        if (config->nq.weak_policy_tcp_retrans_enable) {
-            do {
-                // if total_send_cnt is 0, since connect may also cause retrans, set
-                // total_send_cnt to 1
-                if (total_send_bytes == 0)
-        total_send_bytes = 1;
-
-      if (retrans_bytes == 0 || total_send_bytes < min_cnt)
-        break;
-
-      int tcp_retrans_percentage = kDefaultWeakPolicyTcpRetransPercentage;
-      if (config->nq.weak_policy_tcp_retrans_percentage >= 0)
-        tcp_retrans_percentage = config->nq.weak_policy_tcp_retrans_percentage;
-
-      if (retrans_bytes * 100 / total_send_bytes >= tcp_retrans_percentage) {
-
-        std::stringstream ss;
-        ss << "retrans_bytes: " << retrans_bytes
-           << ", total_send_bytes: " << total_send_bytes
-           << ", tcp_retrans_percentage: " << tcp_retrans_percentage;
-        weak_net_reason_ = ss.str();
-        return true;
-      }
-            } while(0);
-        }
-
-        // judge by tcp_recv_len policy
-        if (config->nq.weak_policy_tcp_recv_len_enable) {
-            do {
-                if (recv_mss_len_cnt == 0 || total_recv_cnt == 0 ||
-                    total_recv_cnt < min_cnt)
-                    break;
-
-                int tcp_recv_len_percentage = kDefaultWeakPolicyTcpRecvLenPercentage;
-                if (config->nq.weak_policy_tcp_recv_len_percentage >= 0)
-                    tcp_recv_len_percentage =
-                            config->nq.weak_policy_tcp_recv_len_percentage;
-                if (recv_mss_len_cnt * 100 / total_recv_cnt >= tcp_recv_len_percentage) {
-                    std::stringstream ss;
-                    ss << "recv_mss_len_cnt: " << recv_mss_len_cnt
-                       << ", total_recv_cnt: " << total_recv_cnt
-                       << ", tcp_recv_len_percentage: " << tcp_recv_len_percentage;
-                    weak_net_reason_ = ss.str();
-                    return true;
-                }
-            } while(0);
-        }
-
-        // judge by tcp_rtt policy
-        if (config->nq.weak_policy_tcp_rtt_enable) {
-            do {
-                if (tcp_rtt_weak_cnt == 0 || total_tcp_rtt_cnt == 0 || total_tcp_rtt_cnt < min_cnt)
-                    break;
-
-                int tcp_rtt_percentage = kDefaultWeakPolicyTcpRttPercentage;
-                if (config->nq.weak_policy_tcp_rtt_percentage >= 0)
-                    tcp_rtt_percentage = config->nq.weak_policy_tcp_rtt_percentage;
-                if (tcp_rtt_weak_cnt * 100 / total_tcp_rtt_cnt >= tcp_rtt_percentage) {
-                    std::stringstream ss;
-                    ss << "tcp_rtt_weak_cnt: " << tcp_rtt_weak_cnt
-                       << ", total_tcp_rtt_cnt: " << total_tcp_rtt_cnt
-                       << ", tcp_rtt_percentage: " << tcp_rtt_percentage;
-                    weak_net_reason_ = ss.str();
-                    return true;
-                }
-            } while(0);
-        }
+        //...
+        //...
+        //...
+        
 #endif
         return false;
     }
 
-    bool JudgeWeakNetByUrlRequestRecordsForData(int window, int min_cnt) {
-        const baidu::BdConfigReader* reader = baidu::BdConfigReader::Get();
-        if (!reader) {
-            return false;
-        }
-        const baidu::BdConfig* config = reader->GetBdConfigPtr();
-
+    bool SelectProtocolByUrlRequestRecordsForData(int window, int min_cnt) {
+        //...
+        //...
+        //...
+        
         if (!config->nq.weak_policy_http_ttfb_enable) {
             return false;
         }
@@ -433,12 +285,8 @@ namespace net {
             anchor = now_tick - delta;
         }
 
-        int http_ttfb_threshold = kDefaultWeakPolicyHttpTtfbThresholdMs;
-        if (config->nq.weak_policy_http_ttfb_threshold_ms > 0)
-            http_ttfb_threshold = config->nq.weak_policy_http_ttfb_threshold_ms;
 
         int total_http_ttfb_cnt = 0;
-        int http_ttfb_weak_cnt = 0;
         int total_http_ttfb_sum = 0;
 
         for (auto& it : url_request_records_) {
@@ -450,9 +298,6 @@ namespace net {
 
             total_http_ttfb_cnt++;
             total_http_ttfb_sum = total_http_ttfb_sum + it.second->ttfb.InMilliseconds();
-            if (it.second->ttfb.InMilliseconds() > http_ttfb_threshold) {
-                http_ttfb_weak_cnt++;
-            }
         }
 #if defined(OS_ANDROID)
         Ttfb_avg = total_http_ttfb_cnt > 0 ? (total_http_ttfb_sum / total_http_ttfb_cnt) : 0;
@@ -460,38 +305,22 @@ namespace net {
 
 
 #elif defined(OS_IOS)
-        // judge by http_ttfb policy
-        if (http_ttfb_weak_cnt == 0 ||
-            total_http_ttfb_cnt == 0 ||
-            total_http_ttfb_cnt < min_cnt) {
-            return false;
-        }
-
-        int http_ttfb_percentage = kDefaultWeakPolicyHttpTtfbPercentage;
-        if (config->nq.weak_policy_http_ttfb_percentage >= 0)
-            http_ttfb_percentage = config->nq.weak_policy_http_ttfb_percentage;
-
-        if (http_ttfb_weak_cnt * 100 / total_http_ttfb_cnt >= http_ttfb_percentage) {
-            std::stringstream ss;
-            ss << "http_ttfb_weak_cnt: " << http_ttfb_weak_cnt
-               << ", total_http_ttfb_cnt: " << total_http_ttfb_cnt
-               << ", http_ttfb_percentage: " << http_ttfb_percentage;
-            weak_net_reason_ = ss.str();
-            return true;
-        }
+        //...
+        //...
+        //...
+        
 #endif
         return false;
     }
 
-    bool JudgeWeakNetByXGB(int window, int min_cnt) {
-        const baidu::BdConfigReader* reader = baidu::BdConfigReader::Get();
-        if (!reader) {
-            return false;
-        }
-        const baidu::BdConfig* config = reader->GetBdConfigPtr();
+    bool SelectProtocolByXGB(int window, int min_cnt) {
+        //...
+        //...
+        //...
+                             
 #if defined(OS_ANDROID)
-        JudgeWeakNetBySocketRecordsForData(window, min_cnt);
-        JudgeWeakNetByUrlRequestRecordsForData(window, min_cnt);
+        SelectProtocolBySocketRecordsForData(window, min_cnt);
+        SelectProtocolByUrlRequestRecordsForData(window, min_cnt);
         int duration = Duration;
         int ttfb = Ttfb;
         int rtt = Rtt;
@@ -512,14 +341,12 @@ namespace net {
         Udp_re = Udp;
         if (config->nq.weak_policy_http_ttfb_enable){
             //quic
-#if defined(ENABLE_NQE_DEBUG_LOG)
-#endif
             if (protocol == 5){
                 do{
                     if (ttfb <= 0 || ttfb_avg <= 0 || duration <= 0 || udp < 0 || rtt < 0 || total_send_cnt <= 0 || sends <= 0 || body_recv <= 0 || received_byte <= 0){
                         break;
                     }
-                    weak = JudgeQuic(udp, float(ttfb/ttfb_avg), duration, ttfb, rtt, float(retran_cnt/total_send_cnt), sends, body_recv, ttfb_avg, float(received_byte/duration));
+                    selection = JudgeQuic(udp, float(ttfb/ttfb_avg), duration, ttfb, rtt, float(retran_cnt/total_send_cnt), sends, body_recv, ttfb_avg, float(received_byte/duration));
                 }while(0);
                             }
             //tcp
@@ -528,20 +355,25 @@ namespace net {
                     if (ttfb <= 0 || ttfb_avg <= 0 || duration <= 0 || udp < 0 || rtt < 0 || total_send_cnt <= 0 || sends <= 0 || body_recv <= 0 || received_byte <= 0){
                         break;
                     }
-                    weak = JudgeTcp(duration, ttfb, rtt, float(retran_cnt/total_send_cnt), sends, initcon, ttfb_avg, float(received_byte/duration));
+                    selection = JudgeTcp(duration, ttfb, rtt, float(retran_cnt/total_send_cnt), sends, initcon, ttfb_avg, float(received_byte/duration));
 
                 }while(0);
             }
-            if (weak){
+            if (selection){
                 std::stringstream ss;
-                ss << "xgboost judged";
-                weak_net_reason_ = ss.str();
+                ss << "xgboost selected";
+                quic_selection_reason_ = ss.str();
             }
         }
-        return weak;
-
+        return selection;
+#elif defined(OS_IOS)
+        //...
+        //...
+        //...
+                   
 #endif
     }
+
     bool JudgeQuic(int Udp, float Ttfb_rate, int Duration, int Ttfb, int Rtt, float Retran, int Sends, int Body_recv, int Ttfb_avg, float Performance){
         double quic_input[10] = {double(Udp), double(Ttfb_rate), double(Duration), double(Ttfb), double(Rtt), double(Retran), double(Sends), double(Body_recv), double(Ttfb_avg), double(Performance)};
         double result[2] = {0.0 , 0.0};
@@ -553,6 +385,7 @@ namespace net {
             return false;
         }
     }
+
     bool JudgeTcp(int Duration, int Ttfb, int Rtt, float Retran, int Sends, int Initcon, int Ttfb_avg, float Performance){
         double tcp_input[8] = {double(Duration), double(Ttfb), double(Rtt), double(Retran), double(Sends), double(Initcon), double(Ttfb_avg), double(Performance)};
         double result[2] = {0.0 , 0.0};
@@ -563,6 +396,30 @@ namespace net {
         else {
             return false;
         }
+    }
+    
+    void MaybeNotifyObserversOfNetworkQualityIndex() {
+        DCHECK(thread_checker_.CalledOnValidThread());
+
+        // do not notify unknown
+        if (current_network_quality_index_ == NETWORK_QUALITY_UNKNOWN) {
+            return;
+        }
+
+        // notify changed index
+        if (current_network_quality_index_ == last_notified_network_quality_index_) {
+            return;
+        }
+
+        if (current_network_quality_index_ == NETWORK_QUALITY_BAD ||
+            current_network_quality_index_ == NETWORK_QUALITY_PROBING)
+            ever_notified_weak_net_ = true;
+
+        FOR_EACH_OBSERVER(
+                NetworkQualityIndexObserver,
+                network_quality_index_observer_list_,
+                OnNetworkQualityIndexChanged(current_network_quality_index_));
+        last_notified_network_quality_index_ = current_network_quality_index_;
     }
 
 }  // namespace net
