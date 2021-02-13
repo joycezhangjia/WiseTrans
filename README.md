@@ -1,5 +1,5 @@
 # WiseTrans
-WiseTrans is an adaptive transport protocol selection for mobile web service. See the paper for more details.
+WiseTrans is an adaptive transport protocol selection mechanism for mobile web service. See the paper for more details.
 
 ## Offline Training
 WiseTrans collects logs on testbed with various network conditions for offline training.  
